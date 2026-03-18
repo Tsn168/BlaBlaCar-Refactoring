@@ -1,110 +1,87 @@
 import 'package:blabla/model/ride_pref/ride_pref.dart';
-import 'package:blabla/services/ride_prefs_service.dart';
+import 'package:blabla/ui/screens/home/view_model/home_model.dart';
+import 'package:blabla/ui/state/ride_preference_state.dart';
+import 'package:blabla/ui/widgets/pickers/bla_ride_preference_picker.dart';
 import 'package:flutter/material.dart';
-import '../../../utils/animations_util.dart';
+import 'package:provider/provider.dart';
+import '../../../ui/screens/rides_selection/rides_selection_screen.dart';
 import '../../theme/theme.dart';
-import '../../widgets/pickers/bla_ride_preference_picker.dart';
-import '../rides_selection/rides_selection_screen.dart';
 import 'widgets/home_history_tile.dart';
 
-const String blablaHomeImagePath = 'assets/images/blabla_home.png';
-
-///
-/// This screen allows user to:
-/// - Enter his/her ride preference and launch a search on it
-/// - Or select a last entered ride preferences and launch a search on it
-///
-class HomeScreen extends StatefulWidget {
+// 1. The new HomeScreen: A simple wrapper that provides the ViewModel.
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => HomeViewModel(context.read<RidePreferenceState>()),
+      child: const HomeContent(),
+    );
+  }
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  void onRidePrefSelected(RidePreference selectedPreference) async {
-    // 1- Ask the service to update the current preference
-    RidePrefsService.selectPreference(selectedPreference);
+// 2. The HomeContent: A StatelessWidget that builds the UI from the ViewModel.
+class HomeContent extends StatelessWidget {
+  const HomeContent({super.key});
 
-    // 2 - Navigate to the rides screen
-    await Navigator.of(
+  void _onRidePreferenceSelected(
+    BuildContext context,
+    RidePreference preference,
+  ) {
+    // Call the ViewModel to update the state
+    context.read<HomeViewModel>().onRidePreferenceSelected(preference);
+
+    // Navigate to the next screen
+    Navigator.of(
       context,
-    ).push(AnimationUtils.createBottomToTopRoute(RidesSelectionScreen()));
-
-    // 3 - After wait  - Update the state   - TODO Improve this with proper state managagement
-    setState(() {});
+    ).push(MaterialPageRoute(builder: (_) => const RidesSelectionScreen()));
   }
 
   @override
-  Widget build(context) {
-    return Stack(children: [_buildBackground(), _buildForeground()]);
-  }
+  Widget build(BuildContext context) {
+    // Watch the ViewModel for changes
+    final viewModel = context.watch<HomeViewModel>();
 
-  Widget _buildForeground() {
-    return Column(
-      children: [
-        // 1 - THE HEADER
-        SizedBox(height: 16),
-        Align(
-          alignment: AlignmentGeometry.center,
-          child: Text(
-            "Your pick of rides at low price",
-            style: BlaTextStyles.heading.copyWith(color: Colors.white),
-          ),
-        ),
-        SizedBox(height: 100),
-
-        Container(
-          margin: EdgeInsets.symmetric(horizontal: BlaSpacings.xxl),
-          decoration: BoxDecoration(
-            color: Colors.white, // White background
-            borderRadius: BorderRadius.circular(16), // Rounded corners
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.start,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // 2 - THE FORM
-              BlaRidePreferencePicker(
-                initRidePreference: RidePrefsService.selectedPreference,
-                onRidePreferenceSelected: onRidePrefSelected,
-              ),
-              SizedBox(height: BlaSpacings.m),
-
-              // 3 - THE HISTORY
-              _buildHistory(),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHistory() {
-    // Reverse the history of preferences
-    List<RidePreference> history = RidePrefsService.preferenceHistory.reversed
-        .toList();
-    return SizedBox(
-      height: 200, // Set a fixed height
-      child: ListView.builder(
-        shrinkWrap: true, // Fix ListView height issue
-        physics: AlwaysScrollableScrollPhysics(),
-        itemCount: history.length,
-        itemBuilder: (ctx, index) => HomeHistoryTile(
-          ridePref: history[index],
-          onPressed: () => onRidePrefSelected(history[index]),
-        ),
+    return Scaffold(
+      appBar: AppBar(
+        centerTitle: true,
+        title: Image.asset('assets/images/logo.png', height: 32),
       ),
-    );
-  }
-
-  Widget _buildBackground() {
-    return SizedBox(
-      width: double.infinity,
-      height: 340,
-      child: Image.asset(
-        blablaHomeImagePath,
-        fit: BoxFit.cover, // Adjust image fit to cover the container
+      body: Padding(
+        padding: const EdgeInsets.all(BlaSpacings.l),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // The preference picker now calls our method
+            BlaRidePreferencePicker(
+              onRidePreferenceSelected: (preference) =>
+                  _onRidePreferenceSelected(context, preference),
+            ),
+            const SizedBox(height: BlaSpacings.l),
+            Text('Recent searches', style: BlaTextStyles.h2),
+            const SizedBox(height: BlaSpacings.m),
+            // The history list is now built from the ViewModel
+            if (viewModel.isLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (viewModel.preferenceHistory.isEmpty)
+              const Text('No recent searches yet.')
+            else
+              Expanded(
+                child: ListView.builder(
+                  itemCount: viewModel.preferenceHistory.length,
+                  itemBuilder: (context, index) {
+                    final ridePref = viewModel.preferenceHistory[index];
+                    return HomeHistoryTile(
+                      ridePref: ridePref,
+                      onPressed: () =>
+                          _onRidePreferenceSelected(context, ridePref),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
