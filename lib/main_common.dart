@@ -5,6 +5,7 @@ import 'data/repositories/ride/ride_repository.dart';
 import 'ui/screens/home/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'ui/state/ride_preference_state.dart';
 
 void mainCommon({
   required LocationsRepository locationsRepository,
@@ -17,6 +18,9 @@ void mainCommon({
         Provider<LocationsRepository>.value(value: locationsRepository),
         Provider<RidesRepository>.value(value: ridesRepository),
         Provider<RidePrefsRepository>.value(value: ridePrefsRepository),
+        ChangeNotifierProvider(
+          create: (context) => RidePreferenceState(ridePrefsRepository),
+        ),
       ],
       child: const BlaBlaApp(),
     ),
