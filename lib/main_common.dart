@@ -1,8 +1,8 @@
 // filepath: lib/app/main_common.dart
-import '../data/repositories/location/location_repository.dart';
-import '../data/repositories/ride_preference/ride_preference_repository.dart';
-import '../data/repositories/ride/ride_repository.dart';
-import '../ui/screens/home/home_screen.dart';
+import 'data/repositories/location/location_repository.dart';
+import 'data/repositories/ride_preference/ride_preference_repository.dart';
+import 'data/repositories/ride/ride_repository.dart';
+import 'ui/screens/home/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../data/repositories/ride/ride_repository.dart';
 import '../../../model/ride/ride.dart';
 import '../../../model/ride_pref/ride_pref.dart';
 import '../../../services/ride_prefs_service.dart';
-import '../../../services/rides_service.dart';
 import '../../../utils/animations_util.dart' show AnimationUtils;
 import '../../theme/theme.dart';
 import 'widgets/ride_preference_modal.dart';
@@ -23,6 +25,17 @@ class RidesSelectionScreen extends StatefulWidget {
 }
 
 class _RidesSelectionScreenState extends State<RidesSelectionScreen> {
+  late Future<List<Ride>> _matchingRidesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initially, fetch rides using the preference from the static service.
+    _matchingRidesFuture = context.read<RidesRepository>().getRidesFor(
+      RidePrefsService.selectedPreference!,
+    );
+  }
+
   void onBackTap() {
     Navigator.pop(context);
   }
@@ -35,11 +48,9 @@ class _RidesSelectionScreenState extends State<RidesSelectionScreen> {
     // Later
   }
 
+  // This getter is still needed for the header and for updating preferences.
   RidePreference get selectedRidePreference =>
-      RidePrefsService.selectedPreference!; // not null at this state
-
-  List<Ride> get matchingRides =>
-      RidesService.getRidesFor(selectedRidePreference);
+      RidePrefsService.selectedPreference!;
 
   void onPreferencePressed() async {
     // 1 - Navigate to the rides preference picker
@@ -54,8 +65,12 @@ class _RidesSelectionScreenState extends State<RidesSelectionScreen> {
       // 2 - Ask the service to update the current preference
       RidePrefsService.selectPreference(newPreference);
 
-      // 3 -   Update the widget state  - TODO Improve this with proper state managagement
-      setState(() {});
+      // 3 - Update the widget state by re-fetching the rides with the new preference
+      setState(() {
+        _matchingRidesFuture = context.read<RidesRepository>().getRidesFor(
+          newPreference,
+        );
+      });
     }
   }
 
@@ -64,7 +79,10 @@ class _RidesSelectionScreenState extends State<RidesSelectionScreen> {
     return Scaffold(
       body: Padding(
         padding: const EdgeInsets.only(
-          left: BlaSpacings.m, right: BlaSpacings.m, top: BlaSpacings.s),
+          left: BlaSpacings.m,
+          right: BlaSpacings.m,
+          top: BlaSpacings.s,
+        ),
         child: Column(
           children: [
             RideSelectionHeader(
@@ -73,16 +91,32 @@ class _RidesSelectionScreenState extends State<RidesSelectionScreen> {
               onFilterPressed: onFilterPressed,
               onPreferencePressed: onPreferencePressed,
             ),
-        
-            SizedBox(height: 100),
-        
+            const SizedBox(height: BlaSpacings.m),
             Expanded(
-              child: ListView.builder(
-                itemCount: matchingRides.length,
-                itemBuilder: (ctx, index) => RideSelectionTile(
-                  ride: matchingRides[index],
-                  onPressed: () => onRideSelected(matchingRides[index]),
-                ),
+              child: FutureBuilder<List<Ride>>(
+                future: _matchingRidesFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  }
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(
+                      child: Text('No rides found for this search.'),
+                    );
+                  }
+
+                  final matchingRides = snapshot.data!;
+                  return ListView.builder(
+                    itemCount: matchingRides.length,
+                    itemBuilder: (ctx, index) => RideSelectionTile(
+                      ride: matchingRides[index],
+                      onPressed: () => onRideSelected(matchingRides[index]),
+                    ),
+                  );
+                },
               ),
             ),
           ],
